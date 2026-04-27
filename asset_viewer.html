@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visualiseur d'Assets (Tile Picker)</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #2c3e50;
+            color: #ecf0f1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        h1 { margin-top: 0; }
+        .controls {
+            margin-bottom: 20px;
+            background: #34495e;
+            padding: 15px;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        select, input {
+            padding: 5px 10px;
+            border-radius: 4px;
+            border: 1px solid #7f8c8d;
+        }
+        #canvas-container {
+            position: relative;
+            max-width: 90vw;
+            max-height: 80vh;
+            overflow: auto;
+            border: 2px solid #bdc3c7;
+            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQoU2NkYGIwYKADYEwU//9PwE5GJcRQDQwk0RCDLMaGIRZiOBZjh3AUIYvwq0N2MTE30zARZgBvVQsxy6d89AAAAABJRU5ErkJggg==') repeat; /* Damier transparent */
+        }
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+        #info {
+            margin-top: 15px;
+            font-size: 1.2em;
+            background: #e74c3c;
+            padding: 10px 20px;
+            border-radius: 5px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>🔍 Tile Picker (Trouve tes coordonnées)</h1>
+    
+    <div class="controls">
+        <label>
+            Image : 
+            <select id="imageSelect">
+                <option value="Modern tiles_Free/Interiors_free/32x32/Room_Builder_free_32x32.png">Room Builder (32x32)</option>
+                <option value="Modern tiles_Free/Interiors_free/32x32/Interiors_free_32x32.png">Interiors Free (32x32)</option>
+                <option value="Top-Down_Retro_Interior/TopDownHouse_FloorsAndWalls.png">Retro Floors & Walls (16x16)</option>
+                <option value="Top-Down_Retro_Interior/TopDownHouse_FurnitureState1.png">Retro Furniture (16x16)</option>
+            </select>
+        </label>
+        <label>
+            Taille de la grille (Tile Size) : 
+            <input type="number" id="tileSize" value="32" min="8" max="128">
+        </label>
+    </div>
+
+    <div id="info">Survole l'image pour voir les coordonnées</div>
+
+    <div id="canvas-container">
+        <canvas id="gridCanvas"></canvas>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gridCanvas');
+        const ctx = canvas.getContext('2d');
+        const imageSelect = document.getElementById('imageSelect');
+        const tileSizeInput = document.getElementById('tileSize');
+        const infoDiv = document.getElementById('info');
+
+        let img = new Image();
+        let tileSize = parseInt(tileSizeInput.value);
+
+        function loadImage() {
+            img.src = imageSelect.value;
+            // Détection automatique de la taille pour les assets rétro
+            if (img.src.includes('Retro')) {
+                tileSizeInput.value = 16;
+            } else {
+                tileSizeInput.value = 32;
+            }
+            tileSize = parseInt(tileSizeInput.value);
+        }
+
+        img.onload = () => {
+            canvas.width = img.width;
+            canvas.height = img.height;
+            drawGrid();
+        };
+
+        function drawGrid() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(img, 0, 0);
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.lineWidth = 1;
+
+            // Lignes verticales
+            for (let x = 0; x <= canvas.width; x += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+
+            // Lignes horizontales
+            for (let y = 0; y <= canvas.height; y += tileSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+        }
+
+        imageSelect.addEventListener('change', loadImage);
+        tileSizeInput.addEventListener('change', (e) => {
+            tileSize = parseInt(e.target.value);
+            drawGrid();
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mouseX = e.clientX - rect.left;
+            const mouseY = e.clientY - rect.top;
+
+            const col = Math.floor(mouseX / tileSize);
+            const row = Math.floor(mouseY / tileSize);
+
+            infoDiv.innerHTML = `📍 Colonne (X) : <strong>${col}</strong> | Ligne (Y) : <strong>${row}</strong>`;
+            
+            drawGrid(); // Redraw base
+            
+            // Highlight the hovered tile
+            ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
+            ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.strokeRect(col * tileSize, row * tileSize, tileSize, tileSize);
+        });
+
+        // Charger l'image initiale
+        loadImage();
+
+    </script>
+</body>
+</html>
