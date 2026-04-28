@@ -2,161 +2,768 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Visualiseur d'Assets (Tile Picker)</title>
+    <title>🗺️ Map Editor — Rage Room</title>
+    <!-- Charge map.js pour récupérer TILESETS et MAP_DATA existants -->
+    <script src="map.js"></script>
     <style>
-        body {
-            font-family: Arial, sans-serif;
-            background-color: #2c3e50;
-            color: #ecf0f1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-        h1 { margin-top: 0; }
-        .controls {
-            margin-bottom: 20px;
-            background: #34495e;
-            padding: 15px;
-            border-radius: 8px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-        }
-        select, input {
-            padding: 5px 10px;
-            border-radius: 4px;
-            border: 1px solid #7f8c8d;
-        }
-        #canvas-container {
-            position: relative;
-            max-width: 90vw;
-            max-height: 80vh;
-            overflow: auto;
-            border: 2px solid #bdc3c7;
-            background: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAOklEQVQoU2NkYGIwYKADYEwU//9PwE5GJcRQDQwk0RCDLMaGIRZiOBZjh3AUIYvwq0N2MTE30zARZgBvVQsxy6d89AAAAABJRU5ErkJggg==') repeat; /* Damier transparent */
-        }
-        canvas {
-            display: block;
-            cursor: crosshair;
-        }
-        #info {
-            margin-top: 15px;
-            font-size: 1.2em;
-            background: #e74c3c;
-            padding: 10px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-        }
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family:'Segoe UI',sans-serif; background:#1a1a2e; color:#e0e0e0; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
+
+        #toolbar { background:#16213e; border-bottom:2px solid #0f3460; padding:8px 16px; display:flex; align-items:center; gap:14px; flex-shrink:0; flex-wrap:wrap; }
+        #toolbar h1 { font-size:1rem; color:#e94560; letter-spacing:1px; }
+        .tb-label { font-size:.7rem; color:#888; text-transform:uppercase; }
+        .tb-group { display:flex; align-items:center; gap:6px; }
+        select, input[type=number] { background:#0f3460; border:1px solid #e94560; color:#e0e0e0; padding:4px 8px; border-radius:4px; font-size:.85rem; }
+        .btn { padding:5px 12px; border-radius:4px; border:none; cursor:pointer; font-size:.82rem; font-weight:bold; transition:opacity .15s; }
+        .btn:hover { opacity:.8; }
+        .btn-red    { background:#e94560; color:#fff; }
+        .btn-green  { background:#27ae60; color:#fff; }
+        .btn-blue   { background:#2980b9; color:#fff; }
+        .btn-orange { background:#e67e22; color:#fff; }
+
+        #layer-tabs { display:flex; gap:4px; }
+        .layer-tab { padding:4px 12px; border-radius:4px; cursor:pointer; font-size:.8rem; border:2px solid transparent; background:#0f3460; }
+        .layer-tab.active { border-color:#e94560; background:#e94560; color:#fff; }
+
+        #main { display:flex; flex:1; overflow:hidden; }
+
+        #tileset-panel { width:360px; flex-shrink:0; background:#16213e; border-right:2px solid #0f3460; display:flex; flex-direction:column; overflow:hidden; }
+        #tileset-controls { padding:8px; border-bottom:1px solid #0f3460; display:flex; flex-direction:column; gap:6px; }
+        #tileset-scroll { flex:1; overflow:auto; background:#0d0d1a; padding:4px; }
+        #tileset-canvas { display:block; cursor:crosshair; image-rendering:pixelated; }
+
+        #map-panel { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+        #map-scroll { flex:1; overflow:auto; background:#111; }
+        #map-canvas { display:block; cursor:crosshair; image-rendering:pixelated; }
+
+        #statusbar { background:#0f3460; padding:4px 12px; font-size:.75rem; color:#aaa; display:flex; gap:20px; flex-shrink:0; }
+        #statusbar b { color:#e94560; }
+
+        #modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.8); z-index:100; align-items:center; justify-content:center; }
+        #modal-overlay.open { display:flex; }
+        #modal { background:#16213e; border:2px solid #e94560; border-radius:8px; padding:20px; width:720px; max-width:90vw; display:flex; flex-direction:column; gap:12px; }
+        #modal h2 { color:#e94560; }
+        #export-textarea { width:100%; height:320px; background:#0d0d1a; color:#7ec8e3; border:1px solid #0f3460; border-radius:4px; padding:8px; font-family:monospace; font-size:.78rem; resize:vertical; }
+        #modal-actions { display:flex; gap:8px; justify-content:flex-end; }
+        #map-toolbar { background:#12192e; border-bottom:1px solid #0f3460; padding:5px 16px; display:flex; align-items:center; gap:8px; flex-shrink:0; }
+        #autosave-info { font-size:.72rem; color:#27ae60; margin-left:auto; }
     </style>
 </head>
 <body>
 
-    <h1>🔍 Tile Picker (Trouve tes coordonnées)</h1>
-    
-    <div class="controls">
-        <label>
-            Image : 
-            <select id="imageSelect">
-                <option value="Modern tiles_Free/Interiors_free/32x32/Room_Builder_free_32x32.png">Room Builder (32x32)</option>
-                <option value="Modern tiles_Free/Interiors_free/32x32/Interiors_free_32x32.png">Interiors Free (32x32)</option>
-                <option value="Top-Down_Retro_Interior/TopDownHouse_FloorsAndWalls.png">Retro Floors & Walls (16x16)</option>
-                <option value="Top-Down_Retro_Interior/TopDownHouse_FurnitureState1.png">Retro Furniture (16x16)</option>
-            </select>
-        </label>
-        <label>
-            Taille de la grille (Tile Size) : 
-            <input type="number" id="tileSize" value="32" min="8" max="128">
-        </label>
+<div id="toolbar">
+    <h1>🗺️ MAP EDITOR</h1>
+
+    <div class="tb-group">
+        <span class="tb-label">Layer</span>
+        <div id="layer-tabs">
+            <div class="layer-tab active" data-layer="floor">🟫 Sol</div>
+            <div class="layer-tab"       data-layer="floor_deco">🌺 Sol Déco</div>
+            <div class="layer-tab"       data-layer="walls">🧱 Murs</div>
+            <div class="layer-tab"       data-layer="objects">🪑 Objets bas</div>
+            <div class="layer-tab"       data-layer="objects_top">🏮 Objets haut</div>
+            <div class="layer-tab"       data-layer="ceiling">🏠 Plafond</div>
+        </div>
     </div>
 
-    <div id="info">Survole l'image pour voir les coordonnées</div>
-
-    <div id="canvas-container">
-        <canvas id="gridCanvas"></canvas>
+    <div class="tb-group">
+        <span class="tb-label">Cols</span>
+        <input type="number" id="inp-cols" value="24" min="4" max="80" style="width:52px">
+        <span class="tb-label">Lignes</span>
+        <input type="number" id="inp-rows" value="14" min="4" max="50" style="width:52px">
+        <button class="btn btn-orange" id="btn-resize">Redim.</button>
     </div>
 
-    <script>
-        const canvas = document.getElementById('gridCanvas');
-        const ctx = canvas.getContext('2d');
-        const imageSelect = document.getElementById('imageSelect');
-        const tileSizeInput = document.getElementById('tileSize');
-        const infoDiv = document.getElementById('info');
+    <div class="tb-group" style="margin-left:auto">
+        <button class="btn btn-blue"  id="btn-fill">Remplir layer</button>
+        <button class="btn btn-red"   id="btn-clear">Vider layer</button>
+        <button class="btn btn-green" id="btn-export">⬇ Exporter map.js</button>
+    </div>
+</div>
 
-        let img = new Image();
-        let tileSize = parseInt(tileSizeInput.value);
+<div id="map-toolbar">
+    <span class="tb-label">Carte</span>
+    <select id="map-select" style="min-width:160px"></select>
+    <button class="btn btn-green"  id="btn-map-new">+ Nouveau</button>
+    <button class="btn btn-blue"   id="btn-map-rename">✏ Renommer</button>
+    <button class="btn btn-orange" id="btn-map-dup">⧉ Dupliquer</button>
+    <button class="btn btn-red"    id="btn-map-del">✕ Supprimer</button>
+    <span id="autosave-info">—</span>
+</div>
 
-        function loadImage() {
-            img.src = imageSelect.value;
-            // Détection automatique de la taille pour les assets rétro
-            if (img.src.includes('Retro')) {
-                tileSizeInput.value = 16;
-            } else {
-                tileSizeInput.value = 32;
+<div id="main">
+    <div id="tileset-panel">
+        <div id="tileset-controls">
+            <div class="tb-group">
+                <span class="tb-label">Tileset</span>
+                <select id="tileset-select" style="flex:1"></select>
+            </div>
+            <div class="tb-group">
+                <span class="tb-label">Zoom tileset</span>
+                <input type="number" id="tileset-zoom" value="3" min="1" max="8" style="width:48px">
+                <span class="tb-label" style="margin-left:8px">Zoom map</span>
+                <input type="number" id="map-zoom" value="3" min="1" max="8" style="width:48px">
+            </div>
+            <div id="selected-info" style="font-size:.75rem;color:#e94560;padding:2px 0">— glisse dans le tileset pour sélectionner —</div>
+        </div>
+        <div id="tileset-scroll">
+            <canvas id="tileset-canvas"></canvas>
+        </div>
+    </div>
+
+    <div id="map-panel">
+        <div id="map-scroll">
+            <canvas id="map-canvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<div id="statusbar">
+    <span>Sélection : <b id="st-sel">—</b></span>
+    <span>Cellule : <b id="st-cell">—</b></span>
+    <span>Layer : <b id="st-layer">floor</b></span>
+    <span>Clic gauche = peindre &nbsp;|&nbsp; Clic droit = effacer &nbsp;|&nbsp; Maj+Clic = pipette</span>
+</div>
+
+<div id="modal-overlay">
+    <div id="modal">
+        <h2>⬇ Export map.js</h2>
+        <p style="font-size:.8rem;color:#aaa">Copie le bloc <code>const MAP_DATA</code> ci-dessous et remplace celui de ton <code>map.js</code>.</p>
+        <textarea id="export-textarea" readonly></textarea>
+        <div id="modal-actions">
+            <button class="btn btn-green" id="btn-copy">📋 Copier</button>
+            <button class="btn btn-red"   id="btn-close-modal">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────
+function deepCopyLayer(layer) {
+    return layer.map(row => row.map(cell =>
+        (cell && cell !== 0) ? [...cell] : null
+    ));
+}
+
+function emptyLayer(cols, rows) {
+    return Array.from({ length: rows }, () => Array(cols).fill(null));
+}
+
+// ─────────────────────────────────────────────
+// STATE — initialisé depuis MAP_DATA existant
+// ─────────────────────────────────────────────
+const state = {
+    cols: MAP_DATA.cols,
+    rows: MAP_DATA.rows,
+    tileSize: MAP_DATA.tileSize,
+
+    activeLayer: 'floor',
+    layers: {
+        floor:       deepCopyLayer(MAP_DATA.layers.floor),
+        floor_deco:  MAP_DATA.layers.floor_deco  ? deepCopyLayer(MAP_DATA.layers.floor_deco)  : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
+        walls:       deepCopyLayer(MAP_DATA.layers.walls),
+        objects:     deepCopyLayer(MAP_DATA.layers.objects),
+        objects_top: MAP_DATA.layers.objects_top ? deepCopyLayer(MAP_DATA.layers.objects_top) : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
+        ceiling:     MAP_DATA.layers.ceiling     ? deepCopyLayer(MAP_DATA.layers.ceiling)     : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
+    },
+
+    activeTileset: 'retro_walls',
+    tsZoom: 3,
+    mapZoom: 3,
+
+    // Sélection multi-tiles dans le tileset (drag)
+    tsSelStart: null,   // { col, row }
+    tsSelEnd:   null,   // { col, row }
+    tsSelecting: false,
+
+    // Peinture sur la map
+    painting: false,
+    erasing:  false,
+
+    hoverCell: null,
+    hoverTile: null,
+
+    // Multi-maps
+    allMaps: {},
+    currentMapName: '',
+};
+
+// Sync inputs
+document.getElementById('inp-cols').value = state.cols;
+document.getElementById('inp-rows').value = state.rows;
+
+// ─────────────────────────────────────────────
+// IMAGES
+// ─────────────────────────────────────────────
+const images = {};
+Object.keys(TILESETS).forEach(key => {
+    const img = new Image();
+    img.src = TILESETS[key].src;
+    img.onload = () => { renderTileset(); renderMap(); };
+    images[key] = img;
+});
+
+// ─────────────────────────────────────────────
+// SELECTION HELPERS
+// ─────────────────────────────────────────────
+function getSelRect() {
+    if (!state.tsSelStart || !state.tsSelEnd) return null;
+    const c0 = Math.min(state.tsSelStart.col, state.tsSelEnd.col);
+    const r0 = Math.min(state.tsSelStart.row, state.tsSelEnd.row);
+    const c1 = Math.max(state.tsSelStart.col, state.tsSelEnd.col);
+    const r1 = Math.max(state.tsSelStart.row, state.tsSelEnd.row);
+    return { c0, r0, c1, r1, w: c1 - c0 + 1, h: r1 - r0 + 1 };
+}
+
+function selHasTile() {
+    return state.tsSelStart !== null && state.tsSelEnd !== null;
+}
+
+// ─────────────────────────────────────────────
+// TILESET CANVAS
+// ─────────────────────────────────────────────
+const tsCanvas = document.getElementById('tileset-canvas');
+const tsCtx    = tsCanvas.getContext('2d');
+
+function renderTileset() {
+    const key  = state.activeTileset;
+    const img  = images[key];
+    const zoom = state.tsZoom;
+    const ts   = TILESETS[key].tileSize;
+    if (!img.complete || !img.naturalWidth) return;
+
+    tsCanvas.width  = img.naturalWidth  * zoom;
+    tsCanvas.height = img.naturalHeight * zoom;
+    tsCtx.imageSmoothingEnabled = false;
+    tsCtx.drawImage(img, 0, 0, tsCanvas.width, tsCanvas.height);
+
+    const tw = ts * zoom;
+
+    // Grid
+    tsCtx.strokeStyle = 'rgba(255,255,255,0.3)';
+    tsCtx.lineWidth = 1;
+    for (let x = 0; x <= tsCanvas.width;  x += tw) { tsCtx.beginPath(); tsCtx.moveTo(x,0); tsCtx.lineTo(x, tsCanvas.height); tsCtx.stroke(); }
+    for (let y = 0; y <= tsCanvas.height; y += tw) { tsCtx.beginPath(); tsCtx.moveTo(0,y); tsCtx.lineTo(tsCanvas.width, y);  tsCtx.stroke(); }
+
+    // Hover
+    if (state.hoverTile && !state.tsSelecting) {
+        tsCtx.fillStyle = 'rgba(233,69,96,0.25)';
+        tsCtx.fillRect(state.hoverTile.col * tw, state.hoverTile.row * tw, tw, tw);
+    }
+
+    // Selection rectangle
+    const sel = getSelRect();
+    if (sel) {
+        tsCtx.fillStyle   = 'rgba(39,174,96,0.3)';
+        tsCtx.strokeStyle = '#27ae60';
+        tsCtx.lineWidth   = 2;
+        tsCtx.fillRect  (sel.c0 * tw, sel.r0 * tw, sel.w * tw, sel.h * tw);
+        tsCtx.strokeRect(sel.c0 * tw, sel.r0 * tw, sel.w * tw, sel.h * tw);
+    }
+}
+
+function tsTileFromEvent(e) {
+    const rect  = tsCanvas.getBoundingClientRect();
+    const scaleX = tsCanvas.width  / rect.width;
+    const scaleY = tsCanvas.height / rect.height;
+    const ts    = TILESETS[state.activeTileset].tileSize * state.tsZoom;
+    return {
+        col: Math.floor((e.clientX - rect.left) * scaleX / ts),
+        row: Math.floor((e.clientY - rect.top)  * scaleY / ts),
+    };
+}
+
+tsCanvas.addEventListener('mousedown', (e) => {
+    state.tsSelecting = true;
+    state.tsSelStart  = tsTileFromEvent(e);
+    state.tsSelEnd    = { ...state.tsSelStart };
+    renderTileset();
+    updateSelInfo();
+});
+
+tsCanvas.addEventListener('mousemove', (e) => {
+    state.hoverTile = tsTileFromEvent(e);
+    if (state.tsSelecting) {
+        state.tsSelEnd = tsTileFromEvent(e);
+        updateSelInfo();
+    }
+    renderTileset();
+});
+
+tsCanvas.addEventListener('mouseup', (e) => {
+    state.tsSelEnd    = tsTileFromEvent(e);
+    state.tsSelecting = false;
+    renderTileset();
+    updateSelInfo();
+});
+
+tsCanvas.addEventListener('mouseleave', () => {
+    state.hoverTile   = null;
+    state.tsSelecting = false;
+    renderTileset();
+});
+
+function updateSelInfo() {
+    const sel = getSelRect();
+    if (!sel) { document.getElementById('selected-info').textContent = '— aucune sélection —'; return; }
+    const key = state.activeTileset;
+    document.getElementById('selected-info').textContent =
+        `${TILESETS[key].label}  [${sel.c0},${sel.r0}] → [${sel.c1},${sel.r1}]  (${sel.w}×${sel.h})`;
+    document.getElementById('st-sel').textContent = `${sel.w}×${sel.h}`;
+}
+
+// ─────────────────────────────────────────────
+// MAP CANVAS
+// ─────────────────────────────────────────────
+const mapCanvas = document.getElementById('map-canvas');
+const mapCtx    = mapCanvas.getContext('2d');
+const CP = () => state.tileSize * state.mapZoom;
+
+function resizeMapCanvas() {
+    mapCanvas.width  = state.cols * CP();
+    mapCanvas.height = state.rows * CP();
+}
+
+function renderMap() {
+    resizeMapCanvas();
+    mapCtx.imageSmoothingEnabled = false;
+    mapCtx.fillStyle = '#111';
+    mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
+
+    ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(lName => {
+        mapCtx.globalAlpha = (lName === state.activeLayer) ? 1.0 : 0.35;
+        const layer = state.layers[lName];
+        const cp    = CP();
+        for (let r = 0; r < layer.length; r++) {
+            for (let c = 0; c < layer[r].length; c++) {
+                const cell = layer[r][c];
+                if (!cell) continue;
+                const [tsKey, tCol, tRow] = cell;
+                const img = images[tsKey];
+                const ts  = TILESETS[tsKey].tileSize;
+                if (!img.complete) continue;
+                mapCtx.drawImage(img, tCol*ts, tRow*ts, ts, ts, c*cp, r*cp, cp, cp);
             }
-            tileSize = parseInt(tileSizeInput.value);
+        }
+    });
+    mapCtx.globalAlpha = 1.0;
+
+    // Grid
+    const cp = CP();
+    mapCtx.strokeStyle = 'rgba(255,255,255,0.08)';
+    mapCtx.lineWidth   = 1;
+    for (let x = 0; x <= mapCanvas.width;  x += cp) { mapCtx.beginPath(); mapCtx.moveTo(x,0); mapCtx.lineTo(x, mapCanvas.height); mapCtx.stroke(); }
+    for (let y = 0; y <= mapCanvas.height; y += cp) { mapCtx.beginPath(); mapCtx.moveTo(0,y); mapCtx.lineTo(mapCanvas.width, y);  mapCtx.stroke(); }
+
+    // Hover + preview selection
+    if (state.hoverCell) {
+        const { c, r } = state.hoverCell;
+        const sel = getSelRect();
+        const cp  = CP();
+
+        if (sel && !state.erasing) {
+            // Affiche le contour de la zone qu'on va peindre
+            mapCtx.strokeStyle = '#27ae60';
+            mapCtx.lineWidth   = 2;
+            mapCtx.strokeRect(c * cp, r * cp, sel.w * cp, sel.h * cp);
+
+            // Preview tiles
+            const key = state.activeTileset;
+            const img = images[key];
+            const ts  = TILESETS[key].tileSize;
+            if (img.complete) {
+                mapCtx.globalAlpha = 0.55;
+                for (let dr = 0; dr < sel.h; dr++) {
+                    for (let dc = 0; dc < sel.w; dc++) {
+                        const mc = c + dc; const mr = r + dr;
+                        if (mc >= state.cols || mr >= state.rows) continue;
+                        const tCol = sel.c0 + dc;
+                        const tRow = sel.r0 + dr;
+                        mapCtx.drawImage(img, tCol*ts, tRow*ts, ts, ts, mc*cp, mr*cp, cp, cp);
+                    }
+                }
+                mapCtx.globalAlpha = 1.0;
+            }
+        } else {
+            mapCtx.fillStyle   = state.erasing ? 'rgba(233,69,96,0.3)' : 'rgba(255,255,255,0.1)';
+            mapCtx.fillRect(c*cp, r*cp, cp, cp);
+            mapCtx.strokeStyle = '#e94560';
+            mapCtx.lineWidth   = 1;
+            mapCtx.strokeRect(c*cp, r*cp, cp, cp);
         }
 
-        img.onload = () => {
-            canvas.width = img.width;
-            canvas.height = img.height;
-            drawGrid();
-        };
+        document.getElementById('st-cell').textContent = `col=${c} row=${r}`;
+    }
+}
 
-        function drawGrid() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.drawImage(img, 0, 0);
+function getCellFromEvent(e) {
+    const rect   = mapCanvas.getBoundingClientRect();
+    const scaleX = mapCanvas.width  / rect.width;
+    const scaleY = mapCanvas.height / rect.height;
+    const cp     = CP();
+    return {
+        c: Math.floor((e.clientX - rect.left) * scaleX / cp),
+        r: Math.floor((e.clientY - rect.top)  * scaleY / cp),
+    };
+}
 
-            ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-            ctx.lineWidth = 1;
+function paintAtCell(c, r) {
+    const layer = state.layers[state.activeLayer];
+    const sel   = getSelRect();
 
-            // Lignes verticales
-            for (let x = 0; x <= canvas.width; x += tileSize) {
-                ctx.beginPath();
-                ctx.moveTo(x, 0);
-                ctx.lineTo(x, canvas.height);
-                ctx.stroke();
-            }
-
-            // Lignes horizontales
-            for (let y = 0; y <= canvas.height; y += tileSize) {
-                ctx.beginPath();
-                ctx.moveTo(0, y);
-                ctx.lineTo(canvas.width, y);
-                ctx.stroke();
-            }
+    if (state.erasing) {
+        // Efface toute la sélection
+        if (sel) {
+            for (let dr = 0; dr < sel.h; dr++)
+                for (let dc = 0; dc < sel.w; dc++) {
+                    const mc = c + dc; const mr = r + dr;
+                    if (mc < state.cols && mr < state.rows) layer[mr][mc] = null;
+                }
+        } else {
+            if (c >= 0 && r >= 0 && c < state.cols && r < state.rows) layer[r][c] = null;
         }
+        return;
+    }
 
-        imageSelect.addEventListener('change', loadImage);
-        tileSizeInput.addEventListener('change', (e) => {
-            tileSize = parseInt(e.target.value);
-            drawGrid();
+    if (!sel) return;
+    const key = state.activeTileset;
+    for (let dr = 0; dr < sel.h; dr++) {
+        for (let dc = 0; dc < sel.w; dc++) {
+            const mc = c + dc; const mr = r + dr;
+            if (mc < 0 || mr < 0 || mc >= state.cols || mr >= state.rows) continue;
+            layer[mr][mc] = [key, sel.c0 + dc, sel.r0 + dr];
+        }
+    }
+}
+
+function pickCell(c, r) {
+    for (const lName of ['ceiling','objects_top','objects','walls','floor_deco','floor']) {
+        const cell = state.layers[lName][r]?.[c];
+        if (cell) {
+            const [tsKey, tCol, tRow] = cell;
+            state.activeTileset  = tsKey;
+            state.tsSelStart     = { col: tCol, row: tRow };
+            state.tsSelEnd       = { col: tCol, row: tRow };
+            document.getElementById('tileset-select').value = tsKey;
+            renderTileset();
+            updateSelInfo();
+            break;
+        }
+    }
+}
+
+mapCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+mapCanvas.addEventListener('mousemove', (e) => {
+    state.hoverCell = getCellFromEvent(e);
+    if (state.painting) { paintAtCell(state.hoverCell.c, state.hoverCell.r); }
+    renderMap();
+});
+
+mapCanvas.addEventListener('mouseleave', () => {
+    state.hoverCell = null;
+    state.painting  = false;
+    state.erasing   = false;
+    renderMap();
+});
+
+mapCanvas.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const { c, r } = getCellFromEvent(e);
+    if (e.shiftKey) { pickCell(c, r); return; }
+    state.painting = true;
+    state.erasing  = (e.button === 2);
+    paintAtCell(c, r);
+    renderMap();
+});
+
+mapCanvas.addEventListener('mouseup', () => {
+    state.painting = false;
+    state.erasing  = false;
+});
+
+// ─────────────────────────────────────────────
+// TILESET SELECT
+// ─────────────────────────────────────────────
+const tsSelect = document.getElementById('tileset-select');
+Object.entries(TILESETS).forEach(([key, ts]) => {
+    const opt = document.createElement('option');
+    opt.value = key; opt.textContent = ts.label;
+    tsSelect.appendChild(opt);
+});
+tsSelect.value = state.activeTileset;
+tsSelect.addEventListener('change', () => {
+    state.activeTileset = tsSelect.value;
+    state.tsSelStart = null; state.tsSelEnd = null;
+    document.getElementById('selected-info').textContent = '— aucune sélection —';
+    renderTileset();
+});
+
+// ─────────────────────────────────────────────
+// ZOOM
+// ─────────────────────────────────────────────
+document.getElementById('tileset-zoom').addEventListener('change', e => {
+    state.tsZoom = Math.max(1, parseInt(e.target.value) || 3);
+    renderTileset();
+});
+document.getElementById('map-zoom').addEventListener('change', e => {
+    state.mapZoom = Math.max(1, parseInt(e.target.value) || 3);
+    renderMap();
+});
+
+// ─────────────────────────────────────────────
+// LAYER TABS
+// ─────────────────────────────────────────────
+document.querySelectorAll('.layer-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.layer-tab').forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        state.activeLayer = tab.dataset.layer;
+        document.getElementById('st-layer').textContent = state.activeLayer;
+        renderMap();
+    });
+});
+
+// ─────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────
+document.getElementById('btn-resize').addEventListener('click', () => {
+    const nc = parseInt(document.getElementById('inp-cols').value);
+    const nr = parseInt(document.getElementById('inp-rows').value);
+    if (!nc || !nr) return;
+    ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(lName => {
+        const old = state.layers[lName];
+        const neu = emptyLayer(nc, nr);
+        for (let r = 0; r < Math.min(old.length, nr); r++)
+            for (let c = 0; c < Math.min((old[0]||[]).length, nc); c++)
+                neu[r][c] = old[r][c];
+        state.layers[lName] = neu;
+    });
+    state.cols = nc; state.rows = nr;
+    renderMap();
+});
+
+// ─────────────────────────────────────────────
+// FILL / CLEAR
+// ─────────────────────────────────────────────
+document.getElementById('btn-fill').addEventListener('click', () => {
+    const sel = getSelRect();
+    if (!sel) { alert('Sélectionne d\'abord des tiles dans le tileset !'); return; }
+    const key   = state.activeTileset;
+    const layer = state.layers[state.activeLayer];
+    for (let r = 0; r < state.rows; r++)
+        for (let c = 0; c < state.cols; c++) {
+            const dr = (r % sel.h); const dc = (c % sel.w);
+            layer[r][c] = [key, sel.c0 + dc, sel.r0 + dr];
+        }
+    renderMap();
+});
+
+document.getElementById('btn-clear').addEventListener('click', () => {
+    if (!confirm(`Vider le layer "${state.activeLayer}" ?`)) return;
+    state.layers[state.activeLayer] = emptyLayer(state.cols, state.rows);
+    renderMap();
+});
+
+// ─────────────────────────────────────────────
+// MULTI-MAP MANAGEMENT
+// ─────────────────────────────────────────────
+const LS_KEY = 'rage_room_maps';
+
+function currentMapSnapshot() {
+    return {
+        cols: state.cols, rows: state.rows, tileSize: state.tileSize,
+        layers: {
+            floor:       state.layers.floor.map(r => r.map(c => c ? [...c] : null)),
+            floor_deco:  state.layers.floor_deco.map(r => r.map(c => c ? [...c] : null)),
+            walls:       state.layers.walls.map(r => r.map(c => c ? [...c] : null)),
+            objects:     state.layers.objects.map(r => r.map(c => c ? [...c] : null)),
+            objects_top: state.layers.objects_top.map(r => r.map(c => c ? [...c] : null)),
+            ceiling:     state.layers.ceiling.map(r => r.map(c => c ? [...c] : null)),
+        }
+    };
+}
+
+function saveCurrent() {
+    if (!state.currentMapName) return;
+    state.allMaps[state.currentMapName] = currentMapSnapshot();
+    saveLs();
+}
+
+function saveLs() {
+    localStorage.setItem(LS_KEY, JSON.stringify(state.allMaps));
+    document.getElementById('autosave-info').textContent =
+        '💾 Sauvegardé ' + new Date().toLocaleTimeString();
+}
+
+function loadMapIntoEditor(name) {
+    const m = state.allMaps[name];
+    if (!m) return;
+    state.currentMapName = name;
+    state.cols = m.cols; state.rows = m.rows; state.tileSize = m.tileSize;
+    const ALL = ['floor','floor_deco','walls','objects','objects_top','ceiling'];
+    ALL.forEach(l => {
+        state.layers[l] = m.layers[l] ? deepCopyLayer(m.layers[l]) : emptyLayer(m.cols, m.rows);
+    });
+    document.getElementById('inp-cols').value = state.cols;
+    document.getElementById('inp-rows').value = state.rows;
+    renderMap();
+}
+
+function updateMapDropdown() {
+    const sel = document.getElementById('map-select');
+    sel.innerHTML = '';
+    Object.keys(state.allMaps).forEach(name => {
+        const opt = document.createElement('option');
+        opt.value = name; opt.textContent = name;
+        sel.appendChild(opt);
+    });
+    sel.value = state.currentMapName;
+}
+
+document.getElementById('map-select').addEventListener('change', (e) => {
+    saveCurrent();
+    loadMapIntoEditor(e.target.value);
+});
+
+document.getElementById('btn-map-new').addEventListener('click', () => {
+    const name = prompt('Nom de la nouvelle carte :', 'Niveau ' + (Object.keys(state.allMaps).length + 1));
+    if (!name || state.allMaps[name]) { alert('Nom invalide ou déjà utilisé.'); return; }
+    saveCurrent();
+    state.allMaps[name] = {
+        cols: 24, rows: 14, tileSize: 16,
+        layers: {
+            floor:       emptyLayer(24,14),
+            floor_deco:  emptyLayer(24,14),
+            walls:       emptyLayer(24,14),
+            objects:     emptyLayer(24,14),
+            objects_top: emptyLayer(24,14),
+            ceiling:     emptyLayer(24,14),
+        }
+    };
+    updateMapDropdown();
+    loadMapIntoEditor(name);
+    saveLs();
+});
+
+document.getElementById('btn-map-rename').addEventListener('click', () => {
+    const oldName = state.currentMapName;
+    const newName = prompt('Nouveau nom :', oldName);
+    if (!newName || newName === oldName) return;
+    if (state.allMaps[newName]) { alert('Ce nom est déjà utilisé.'); return; }
+    saveCurrent();
+    state.allMaps[newName] = state.allMaps[oldName];
+    delete state.allMaps[oldName];
+    state.currentMapName = newName;
+    updateMapDropdown();
+    saveLs();
+});
+
+document.getElementById('btn-map-dup').addEventListener('click', () => {
+    const newName = prompt('Nom de la copie :', state.currentMapName + ' (copie)');
+    if (!newName || state.allMaps[newName]) { alert('Nom invalide ou déjà utilisé.'); return; }
+    saveCurrent();
+    state.allMaps[newName] = currentMapSnapshot();
+    updateMapDropdown();
+    loadMapIntoEditor(newName);
+    saveLs();
+});
+
+document.getElementById('btn-map-del').addEventListener('click', () => {
+    if (Object.keys(state.allMaps).length <= 1) { alert('Impossible de supprimer la dernière carte !'); return; }
+    if (!confirm(`Supprimer "${state.currentMapName}" ?`)) return;
+    delete state.allMaps[state.currentMapName];
+    const first = Object.keys(state.allMaps)[0];
+    updateMapDropdown();
+    loadMapIntoEditor(first);
+    saveLs();
+});
+
+// Auto-save on mouseup after painting
+document.getElementById('map-canvas').addEventListener('mouseup', () => {
+    if (state.painting) saveCurrent();
+    state.painting = false;
+    state.erasing  = false;
+});
+
+// ─────────────────────────────────────────────
+// EXPORT (tous les niveaux → maps.js)
+// ─────────────────────────────────────────────
+function generateExport() {
+    saveCurrent();
+    const serRow = row =>
+        '[' + row.map(c => c === null ? '0' : JSON.stringify(c)).join(',') + ']';
+    const serLayer = (lName, layers) =>
+        `        ${lName}: [\n` +
+        (layers[lName] || []).map(row => `            ${serRow(row)}`).join(',\n') +
+        '\n        ]';
+    const serMap = (name, m) => {
+        const allLayers = ['floor','floor_deco','walls','objects','objects_top','ceiling'];
+        return `    ${JSON.stringify(name)}: {\n        cols:${m.cols}, rows:${m.rows}, tileSize:${m.tileSize}, scale:5,\n        layers:{\n${allLayers.map(l => serLayer(l, m.layers)).join(',\n')}\n        }\n    }`;
+    };  // ← fermeture de serMap
+
+    const mapsBody = Object.entries(state.allMaps).map(([n,m]) => serMap(n,m)).join(',\n');
+    return `// maps.js — généré par l'éditeur (${new Date().toLocaleString()})
+// Remplace map.js dans ton projet et mets à jour index.html
+
+const TILESETS = ${JSON.stringify(TILESETS, null, 4)};
+
+const MAPS = {
+${mapsBody}
+};
+
+// Carte chargée par le jeu (modifiable depuis game.js)
+let CURRENT_LEVEL = ${JSON.stringify(Object.keys(state.allMaps)[0])};
+const MAP_DATA = MAPS[CURRENT_LEVEL];
+`;
+}
+
+document.getElementById('btn-export').addEventListener('click', () => {
+    document.getElementById('export-textarea').value = generateExport();
+    document.getElementById('modal-overlay').classList.add('open');
+});
+document.getElementById('btn-copy').addEventListener('click', () => {
+    navigator.clipboard.writeText(document.getElementById('export-textarea').value)
+        .then(() => alert('✅ Copié dans le presse-papiers !'));
+});
+document.getElementById('btn-close-modal').addEventListener('click', () => {
+    document.getElementById('modal-overlay').classList.remove('open');
+});
+
+// ─────────────────────────────────────────────
+// INIT — localStorage → sinon MAP_DATA de map.js
+// ─────────────────────────────────────────────
+(function init() {
+    const saved = localStorage.getItem(LS_KEY);
+    if (saved) {
+        state.allMaps = JSON.parse(saved);
+        // Convertit les 0 (format export) en null
+        Object.values(state.allMaps).forEach(m => {
+            ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(l => {
+                if (m.layers[l]) m.layers[l] = m.layers[l].map(r => r.map(c => (c && c !== 0) ? c : null));
+            });
         });
-
-        canvas.addEventListener('mousemove', (e) => {
-            const rect = canvas.getBoundingClientRect();
-            const mouseX = e.clientX - rect.left;
-            const mouseY = e.clientY - rect.top;
-
-            const col = Math.floor(mouseX / tileSize);
-            const row = Math.floor(mouseY / tileSize);
-
-            infoDiv.innerHTML = `📍 Colonne (X) : <strong>${col}</strong> | Ligne (Y) : <strong>${row}</strong>`;
-            
-            drawGrid(); // Redraw base
-            
-            // Highlight the hovered tile
-            ctx.fillStyle = 'rgba(231, 76, 60, 0.4)';
-            ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
-            ctx.strokeStyle = '#e74c3c';
-            ctx.lineWidth = 2;
-            ctx.strokeRect(col * tileSize, row * tileSize, tileSize, tileSize);
-        });
-
-        // Charger l'image initiale
-        loadImage();
-
-    </script>
+    } else {
+        // Premier lancement : importe la map actuelle depuis map.js
+    state.allMaps['Niveau 1'] = {
+        cols: state.cols, rows: state.rows, tileSize: state.tileSize,
+        layers: {
+            floor:       state.layers.floor,
+            floor_deco:  state.layers.floor_deco,
+            walls:       state.layers.walls,
+            objects:     state.layers.objects,
+            objects_top: state.layers.objects_top,
+            ceiling:     state.layers.ceiling,
+        }
+    };
+    }
+    const first = Object.keys(state.allMaps)[0];
+    updateMapDropdown();
+    loadMapIntoEditor(first);
+    renderTileset();
+})();
+</script>
 </body>
 </html>
