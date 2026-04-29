@@ -60,6 +60,7 @@
             <div class="layer-tab active" data-layer="floor">🟫 Sol</div>
             <div class="layer-tab"       data-layer="floor_deco">🌺 Sol Déco</div>
             <div class="layer-tab"       data-layer="walls">🧱 Murs</div>
+            <div class="layer-tab"       data-layer="walls_deco">🖼️ Mur Déco</div>
             <div class="layer-tab"       data-layer="objects">🪑 Objets bas</div>
             <div class="layer-tab"       data-layer="objects_top">🏮 Objets haut</div>
             <div class="layer-tab"       data-layer="ceiling">🏠 Plafond</div>
@@ -164,6 +165,7 @@ const state = {
         floor:       deepCopyLayer(MAP_DATA.layers.floor),
         floor_deco:  MAP_DATA.layers.floor_deco  ? deepCopyLayer(MAP_DATA.layers.floor_deco)  : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
         walls:       deepCopyLayer(MAP_DATA.layers.walls),
+        walls_deco:  MAP_DATA.layers.walls_deco  ? deepCopyLayer(MAP_DATA.layers.walls_deco)  : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
         objects:     deepCopyLayer(MAP_DATA.layers.objects),
         objects_top: MAP_DATA.layers.objects_top ? deepCopyLayer(MAP_DATA.layers.objects_top) : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
         ceiling:     MAP_DATA.layers.ceiling     ? deepCopyLayer(MAP_DATA.layers.ceiling)     : emptyLayer(MAP_DATA.cols, MAP_DATA.rows),
@@ -332,7 +334,7 @@ function renderMap() {
     mapCtx.fillStyle = '#111';
     mapCtx.fillRect(0, 0, mapCanvas.width, mapCanvas.height);
 
-    ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(lName => {
+    ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'].forEach(lName => {
         mapCtx.globalAlpha = (lName === state.activeLayer) ? 1.0 : 0.35;
         const layer = state.layers[lName];
         const cp    = CP();
@@ -533,7 +535,7 @@ document.getElementById('btn-resize').addEventListener('click', () => {
     const nc = parseInt(document.getElementById('inp-cols').value);
     const nr = parseInt(document.getElementById('inp-rows').value);
     if (!nc || !nr) return;
-    ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(lName => {
+    ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'].forEach(lName => {
         const old = state.layers[lName];
         const neu = emptyLayer(nc, nr);
         for (let r = 0; r < Math.min(old.length, nr); r++)
@@ -579,6 +581,7 @@ function currentMapSnapshot() {
             floor:       state.layers.floor.map(r => r.map(c => c ? [...c] : null)),
             floor_deco:  state.layers.floor_deco.map(r => r.map(c => c ? [...c] : null)),
             walls:       state.layers.walls.map(r => r.map(c => c ? [...c] : null)),
+            walls_deco:  state.layers.walls_deco.map(r => r.map(c => c ? [...c] : null)),
             objects:     state.layers.objects.map(r => r.map(c => c ? [...c] : null)),
             objects_top: state.layers.objects_top.map(r => r.map(c => c ? [...c] : null)),
             ceiling:     state.layers.ceiling.map(r => r.map(c => c ? [...c] : null)),
@@ -603,7 +606,7 @@ function loadMapIntoEditor(name) {
     if (!m) return;
     state.currentMapName = name;
     state.cols = m.cols; state.rows = m.rows; state.tileSize = m.tileSize;
-    const ALL = ['floor','floor_deco','walls','objects','objects_top','ceiling'];
+    const ALL = ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'];
     ALL.forEach(l => {
         state.layers[l] = m.layers[l] ? deepCopyLayer(m.layers[l]) : emptyLayer(m.cols, m.rows);
     });
@@ -638,6 +641,7 @@ document.getElementById('btn-map-new').addEventListener('click', () => {
             floor:       emptyLayer(24,14),
             floor_deco:  emptyLayer(24,14),
             walls:       emptyLayer(24,14),
+            walls_deco:  emptyLayer(24,14),
             objects:     emptyLayer(24,14),
             objects_top: emptyLayer(24,14),
             ceiling:     emptyLayer(24,14),
@@ -700,7 +704,7 @@ function generateExport() {
         (layers[lName] || []).map(row => `            ${serRow(row)}`).join(',\n') +
         '\n        ]';
     const serMap = (name, m) => {
-        const allLayers = ['floor','floor_deco','walls','objects','objects_top','ceiling'];
+        const allLayers = ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'];
         return `    ${JSON.stringify(name)}: {\n        cols:${m.cols}, rows:${m.rows}, tileSize:${m.tileSize}, scale:5,\n        layers:{\n${allLayers.map(l => serLayer(l, m.layers)).join(',\n')}\n        }\n    }`;
     };  // ← fermeture de serMap
 
@@ -741,7 +745,7 @@ document.getElementById('btn-close-modal').addEventListener('click', () => {
         state.allMaps = JSON.parse(saved);
         // Convertit les 0 (format export) en null
         Object.values(state.allMaps).forEach(m => {
-            ['floor','floor_deco','walls','objects','objects_top','ceiling'].forEach(l => {
+            ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'].forEach(l => {
                 if (m.layers[l]) m.layers[l] = m.layers[l].map(r => r.map(c => (c && c !== 0) ? c : null));
             });
         });
@@ -753,6 +757,7 @@ document.getElementById('btn-close-modal').addEventListener('click', () => {
             floor:       state.layers.floor,
             floor_deco:  state.layers.floor_deco,
             walls:       state.layers.walls,
+            walls_deco:  state.layers.walls_deco,
             objects:     state.layers.objects,
             objects_top: state.layers.objects_top,
             ceiling:     state.layers.ceiling,

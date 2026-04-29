@@ -61,7 +61,7 @@ function drawTile(img, tileCol, tileRow, destX, destY, tileSize, scale) {
 }
 
 // Garantit que tous les layers existent (compat avec anciennes maps)
-const LAYER_NAMES = ['floor','floor_deco','walls','objects','objects_top','ceiling'];
+const LAYER_NAMES = ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'];
 function ensureLayers(mapData) {
     LAYER_NAMES.forEach(name => {
         if (!mapData.layers[name]) {
@@ -94,6 +94,7 @@ function drawEnvironmentBelow() {
     drawLayer(MAP_DATA.layers.floor);
     drawLayer(MAP_DATA.layers.floor_deco);
     drawLayer(MAP_DATA.layers.walls);
+    drawLayer(MAP_DATA.layers.walls_deco);
     drawLayer(MAP_DATA.layers.objects);
 }
 
