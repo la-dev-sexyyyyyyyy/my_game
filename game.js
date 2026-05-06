@@ -108,22 +108,44 @@ function drawEnvironmentAbove() {
 // JOUEUR
 // =============================================
 const player = {
-    x:         MAP_OX + MAP_PX_W / 2,
-    y:         MAP_OY + MAP_PX_H / 2,
-    direction: 'down',
-    moving:    false
+    x:            MAP_OX + MAP_PX_W / 2,
+    y:            MAP_OY + MAP_PX_H / 2,
+    direction:    'down',
+    moving:       false,
+    attacking:    false,
+    hp:           80,
+    maxHp:        100,
+    selectedSlot: 0,
+    inventory: [],
 };
 
 const keys = {};
 const ARROW_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
 
+canvas.addEventListener('click', (e) => {
+    const r   = canvas.getBoundingClientRect();
+    const cx  = (e.clientX - r.left) * (canvas.width  / r.width);
+    const cy  = (e.clientY - r.top)  * (canvas.height / r.height);
+    const idx = getInventorySlotAt(cx, cy);
+    if (idx >= 0 && idx < player.inventory.length) player.selectedSlot = idx;
+});
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    scrollInventory(e.deltaY > 0 ? 1 : -1);
+}, { passive: false });
+
 window.addEventListener('keydown', (e) => {
     if (ARROW_KEYS.includes(e.key)) e.preventDefault();
+    if (e.key === ' ')  { e.preventDefault(); throwSelectedItem(); }
+    if (e.key === 'r')  eatSelectedItem();
+    if (e.key === 'f' && !player.attacking) { player.attacking = true; frame = 0; frameTimer = 0; }
     keys[e.key] = true;
 });
 window.addEventListener('keyup', (e) => { keys[e.key] = false; });
 
 function handleInput() {
+    if (player.attacking) return; // bloqué pendant l'attaque
     player.moving = false;
     if (keys['ArrowUp']    || keys['z']) { player.y -= SPEED; player.direction = 'up';    player.moving = true; }
     if (keys['ArrowDown']  || keys['s']) { player.y += SPEED; player.direction = 'down';  player.moving = true; }
@@ -132,8 +154,8 @@ function handleInput() {
 }
 
 function getFrames() {
-    const anim = player.moving ? 'walk' : 'idle';
-    return sprites[anim][player.direction];
+    if (player.attacking) return sprites.slash[player.direction];
+    return sprites[player.moving ? 'walk' : 'idle'][player.direction];
 }
 
 function drawPlayer() {
@@ -141,8 +163,10 @@ function drawPlayer() {
     if (frame >= frames.length) frame = 0;
     const img = frames[frame];
     if (!img.complete) return;
-    const w = 64 * PLAYER_SCALE;
-    const h = 64 * PLAYER_SCALE;
+    // slash_oversize est en 192×192 (3× le sprite normal 64×64)
+    const spriteNative = player.attacking ? 192 : 64;
+    const w = spriteNative * PLAYER_SCALE;
+    const h = spriteNative * PLAYER_SCALE;
     ctx.drawImage(img, player.x - w / 2, player.y - h / 2, w, h);
 }
 
@@ -155,13 +179,26 @@ function loop() {
     frameTimer += 16;
     if (frameTimer >= FRAME_INTERVAL) {
         frameTimer = 0;
-        frame = (frame + 1) % getFrames().length;
+        frame++;
+        if (player.attacking && frame >= sprites.slash[player.direction].length) {
+            player.attacking = false;
+            frame = 0;
+        } else {
+            frame = frame % getFrames().length;
+        }
     }
+
+    updateWorldItems();
+    updateProjectiles();
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawEnvironmentBelow();
+    drawWorldItems();
     drawPlayer();
+    drawWorldPrompts();
+    drawProjectiles();
     drawEnvironmentAbove();
+    drawHUD();
 
     requestAnimationFrame(loop);
 }

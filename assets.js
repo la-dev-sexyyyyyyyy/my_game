@@ -35,5 +35,10 @@ const sprites = {
         left:  loadFrames('asset/standard/shoot/left',  13),
         right: loadFrames('asset/standard/shoot/right', 13),
     },
-    
+    slash: {
+        down:  loadFrames('asset/custom/slash_oversize/down',  6),
+        up:    loadFrames('asset/custom/slash_oversize/up',    6),
+        left:  loadFrames('asset/custom/slash_oversize/left',  6),
+        right: loadFrames('asset/custom/slash_oversize/right', 6),
+    },
 };
