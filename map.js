@@ -93,8 +93,8 @@ const MAPS = {
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ],
         objects: [
-            [0,0,0,0,0,0,["modern_furniture",7,48],["modern_furniture",8,48],["modern_furniture",11,48],["modern_furniture",12,48],0,0,0,0,0,0,0,0,0,0,0,0,0,0],
-            [0,["modern_furniture",13,44],["modern_furniture",14,44],0,0,0,["modern_furniture",7,49],["modern_furniture",8,49],["modern_furniture",11,49],["modern_furniture",12,49],0,0,0,0,0,0,0,["modern_furniture",10,40],["modern_furniture",11,40],0,0,["modern_furniture",11,35],["modern_furniture",12,35],0],
+            [0,0,0,0,0,0,["modern_furniture",7,48],["modern_furniture",8,48],["modern_furniture",11,48],["modern_furniture",12,48],0,["modern_furniture",4,24],["modern_furniture",5,24],["modern_furniture",6,24],0,0,0,0,0,0,0,0,0,0],
+            [0,["modern_furniture",13,44],["modern_furniture",14,44],0,0,0,["modern_furniture",7,49],["modern_furniture",8,49],["modern_furniture",11,49],["modern_furniture",12,49],0,["modern_furniture",4,25],["modern_furniture",5,25],["modern_furniture",6,25],0,0,0,["modern_furniture",10,40],["modern_furniture",11,40],0,0,["modern_furniture",11,35],["modern_furniture",12,35],0],
             [0,["modern_furniture",13,45],["modern_furniture",14,45],0,0,0,["modern_furniture",7,50],["modern_furniture",8,50],["modern_furniture",11,50],["modern_furniture",12,50],0,0,0,0,0,0,0,["modern_furniture",10,41],["modern_furniture",11,41],0,0,["modern_furniture",11,36],["modern_furniture",12,36],0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",11,37],["modern_furniture",12,37],0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
@@ -109,8 +109,8 @@ const MAPS = {
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]
         ],
         objects_top: [
-            [0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",4,24],["modern_furniture",5,24],["modern_furniture",6,24],0,0,0,0,0,0,0,0,0,0],
-            [0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",4,25],["modern_furniture",5,25],["modern_furniture",6,25],0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+            [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",12,56],0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",12,57],0],
             [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,["modern_furniture",12,58],0],

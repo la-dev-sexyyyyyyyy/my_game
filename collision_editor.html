@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Éditeur de Collision</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #111; color: #eee; font-family: monospace;
+       display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+#toolbar {
+    display: flex; align-items: center; gap: 8px; flex-shrink: 0; flex-wrap: wrap;
+    padding: 6px 10px; background: #1e1e1e; border-bottom: 1px solid #333;
+}
+.btn {
+    background: #333; color: #ccc; border: 1px solid #555;
+    padding: 4px 10px; cursor: pointer; border-radius: 3px;
+    font-family: monospace; font-size: 12px;
+}
+.btn:hover { background: #444; }
+.btn.active { background: #600; border-color: #f44; color: #fff; }
+
+.ctrl { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+.ctrl label { color: #888; white-space: nowrap; }
+.ctrl input[type=range] { width: 80px; accent-color: #e33; }
+.ctrl select {
+    background: #2a2a2a; color: #ccc; border: 1px solid #555;
+    padding: 3px 6px; font-family: monospace; font-size: 12px; cursor: pointer;
+}
+.val { min-width: 26px; text-align: right; color: #aaa; }
+.sep { width: 1px; background: #444; height: 20px; }
+
+#status { flex: 1; font-size: 11px; color: #777; text-align: center; min-width: 180px; }
+
+#canvas-wrap { flex: 1; overflow: auto; background: #0d0d0d; }
+canvas { display: block; cursor: crosshair; image-rendering: pixelated; }
+
+#modal {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.75); z-index: 100;
+    align-items: center; justify-content: center;
+}
+#modal.open { display: flex; }
+#modal-box {
+    background: #1a1a1a; border: 1px solid #555; padding: 16px;
+    width: 560px; max-width: 90vw;
+}
+#modal-box p { margin-bottom: 8px; font-size: 12px; color: #aaa; }
+#code-area {
+    width: 100%; height: 280px; background: #0d0d0d;
+    color: #4f4; font-family: monospace; font-size: 11px;
+    border: 1px solid #333; padding: 6px; resize: none;
+}
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+    <button class="btn active" id="btn-solid">■ Solide</button>
+    <button class="btn"        id="btn-free" >□ Libre</button>
+    <span class="sep"></span>
+
+    <div class="ctrl">
+        <label>Cellule :</label>
+        <select id="cell-sel">
+            <option value="16">16 px (1 tile)</option>
+            <option value="8">8 px (½ tile)</option>
+            <option value="4">4 px (¼ tile)</option>
+            <option value="2">2 px</option>
+            <option value="1">1 px</option>
+        </select>
+    </div>
+    <span class="sep"></span>
+
+    <div class="ctrl">
+        <label>Pinceau :</label>
+        <input type="range" id="brush-slider" min="1" max="16" value="1" step="1">
+        <span class="val" id="brush-label">1</span>
+    </div>
+    <span class="sep"></span>
+
+    <div class="ctrl">
+        <label>Zoom :</label>
+        <input type="range" id="zoom-slider" min="1" max="16" value="4" step="1">
+        <span class="val" id="zoom-label">4×</span>
+    </div>
+    <span class="sep"></span>
+
+    <span style="font-size:11px;color:#888">Shift = effacer · Ctrl+molette = zoom</span>
+    <span id="status">Clique pour peindre</span>
+    <button class="btn" id="btn-copy">📋 Générer collision.js</button>
+</div>
+
+<div id="canvas-wrap">
+    <canvas id="editorCanvas"></canvas>
+</div>
+
+<div id="modal">
+    <div id="modal-box">
+        <p>Copie ce contenu dans <strong>collision.js</strong> :</p>
+        <textarea id="code-area" readonly></textarea>
+        <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn" id="btn-clipboard">Copier dans le presse-papier</button>
+            <button class="btn" id="btn-close">Fermer</button>
+        </div>
+    </div>
+</div>
+
+<script src="assets.js"></script>
+<script src="map.js"></script>
+<script src="collision.js"></script>
+<script>
+'use strict';
+
+const canvas = document.getElementById('editorCanvas');
+const ctx    = canvas.getContext('2d');
+
+const MAP_W_PX = MAP_DATA.cols * MAP_DATA.tileSize; // pixels natifs totaux
+const MAP_H_PX = MAP_DATA.rows * MAP_DATA.tileSize;
+
+// État
+let cellSize  = (typeof COLLISION_CELL !== 'undefined') ? COLLISION_CELL : 16;
+let brushSize = 1;  // en nombre de cellules
+let SCALE     = 4;
+let mode      = 'solid';
+let painting  = false;
+let paintVal  = 1;
+
+// Grille
+let gridRows, gridCols, grid;
+
+function buildGrid(newCell, migrateFrom = null) {
+    const nr = Math.floor(MAP_H_PX / newCell);
+    const nc = Math.floor(MAP_W_PX / newCell);
+    let g = Array.from({ length: nr }, () => Array(nc).fill(0));
+
+    if (migrateFrom) {
+        const { rows: or, cols: oc, data: od, cell: oc_size } = migrateFrom;
+        if (oc_size < newCell) {
+            // Fusion (plusieurs petites cellules → 1 grande) : solide si au moins une sous-cellule l'est
+            const ratio = Math.round(newCell / oc_size);
+            for (let r = 0; r < nr; r++) for (let c = 0; c < nc; c++) {
+                outer: for (let dr = 0; dr < ratio; dr++) for (let dc = 0; dc < ratio; dc++)
+                    if (od[r * ratio + dr]?.[c * ratio + dc]) { g[r][c] = 1; break outer; }
+            }
+        } else {
+            // Expansion : chaque vieille cellule → plusieurs nouvelles
+            const ratio = Math.round(oc_size / newCell);
+            for (let r = 0; r < or; r++) for (let c = 0; c < oc; c++) {
+                if (!od[r][c]) continue;
+                for (let dr = 0; dr < ratio; dr++) for (let dc = 0; dc < ratio; dc++) {
+                    if (r * ratio + dr < nr && c * ratio + dc < nc)
+                        g[r * ratio + dr][c * ratio + dc] = 1;
+                }
+            }
+        }
+    } else if (typeof COLLISION_MAP !== 'undefined' && newCell === 16) {
+        // Charge la collision.js existante si taille correspond
+        for (let r = 0; r < Math.min(nr, COLLISION_MAP.length); r++)
+            for (let c = 0; c < Math.min(nc, (COLLISION_MAP[0]?.length ?? 0)); c++)
+                g[r][c] = COLLISION_MAP[r][c] ?? 0;
+    }
+
+    gridRows = nr; gridCols = nc; grid = g; cellSize = newCell;
+    document.getElementById('cell-sel').value = String(newCell);
+}
+
+// Tilesets
+const tsImgs = {};
+function getImg(key) {
+    if (!tsImgs[key]) { const img = new Image(); img.src = TILESETS[key].src; tsImgs[key] = img; }
+    return tsImgs[key];
+}
+Object.keys(TILESETS).forEach(k => getImg(k));
+
+function applyScale() {
+    canvas.width  = MAP_W_PX * SCALE;
+    canvas.height = MAP_H_PX * SCALE;
+    draw();
+}
+
+function drawLayer(layer) {
+    for (let r = 0; r < layer.length; r++) for (let c = 0; c < layer[r].length; c++) {
+        const cell = layer[r][c]; if (!cell) continue;
+        const [key, tc, tr] = cell;
+        const ts = TILESETS[key].tileSize;
+        const img = getImg(key); if (!img.complete) continue;
+        ctx.drawImage(img, tc * ts, tr * ts, ts, ts,
+            c * ts * SCALE, r * ts * SCALE, ts * SCALE, ts * SCALE);
+    }
+}
+
+function draw() {
+    const sz = cellSize * SCALE;
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const L = MAP_DATA.layers;
+    ['floor','floor_deco','walls','walls_deco','objects','objects_top','ceiling'].forEach(n => {
+        if (L[n]) drawLayer(L[n]);
+    });
+
+    // Overlay collision
+    for (let r = 0; r < gridRows; r++) for (let c = 0; c < gridCols; c++) {
+        if (!grid[r][c]) continue;
+        ctx.fillStyle = 'rgba(220,40,40,0.4)';
+        ctx.fillRect(c * sz, r * sz, sz, sz);
+        if (sz >= 4) {
+            ctx.fillStyle = 'rgba(255,100,100,0.7)';
+            ctx.fillRect(c*sz, r*sz, sz, 1);
+            ctx.fillRect(c*sz, r*sz, 1, sz);
+            ctx.fillRect(c*sz+sz-1, r*sz, 1, sz);
+            ctx.fillRect(c*sz, r*sz+sz-1, sz, 1);
+        }
+    }
+
+    // Grille (seulement si les cellules sont assez grandes)
+    if (sz >= 3) {
+        ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+        ctx.lineWidth = 0.5;
+        for (let c = 0; c <= gridCols; c++) {
+            ctx.beginPath(); ctx.moveTo(c*sz,0); ctx.lineTo(c*sz,canvas.height); ctx.stroke();
+        }
+        for (let r = 0; r <= gridRows; r++) {
+            ctx.beginPath(); ctx.moveTo(0,r*sz); ctx.lineTo(canvas.width,r*sz); ctx.stroke();
+        }
+    }
+
+    // Aperçu pinceau sur la cellule survolée (si peinture en cours, pas de besoin)
+}
+
+function cellAt(e) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width  / rect.width;
+    const sy = canvas.height / rect.height;
+    const sz = cellSize * SCALE;
+    return {
+        col: Math.floor((e.clientX - rect.left) * sx / sz),
+        row: Math.floor((e.clientY - rect.top)  * sy / sz),
+    };
+}
+
+function applyPaint(e) {
+    const { row, col } = cellAt(e);
+    const half = Math.floor(brushSize / 2);
+    let changed = false;
+    for (let dr = -half; dr < brushSize - half; dr++) {
+        for (let dc = -half; dc < brushSize - half; dc++) {
+            const r = row + dr, c = col + dc;
+            if (r < 0 || c < 0 || r >= gridRows || c >= gridCols) continue;
+            grid[r][c] = paintVal;
+            changed = true;
+        }
+    }
+    if (changed) {
+        document.getElementById('status').textContent =
+            `[col ${col}, row ${row}] — cellule ${cellSize}px — pinceau ${brushSize}`;
+        draw();
+    }
+}
+
+canvas.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    painting = true;
+    paintVal = e.shiftKey ? 0 : (mode === 'free' ? 0 : 1);
+    applyPaint(e);
+});
+canvas.addEventListener('mousemove', e => { if (painting) applyPaint(e); });
+canvas.addEventListener('mouseup',    () => { painting = false; });
+canvas.addEventListener('mouseleave', () => { painting = false; });
+
+// Ctrl + molette = zoom
+document.getElementById('canvas-wrap').addEventListener('wheel', e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault();
+    const s = document.getElementById('zoom-slider');
+    const v = Math.max(1, Math.min(16, parseInt(s.value) + (e.deltaY < 0 ? 1 : -1)));
+    s.value = v; SCALE = v;
+    document.getElementById('zoom-label').textContent = v + '×';
+    applyScale();
+}, { passive: false });
+
+// Zoom slider
+document.getElementById('zoom-slider').addEventListener('input', e => {
+    SCALE = parseInt(e.target.value);
+    document.getElementById('zoom-label').textContent = SCALE + '×';
+    applyScale();
+});
+
+// Brush slider
+document.getElementById('brush-slider').addEventListener('input', e => {
+    brushSize = parseInt(e.target.value);
+    document.getElementById('brush-label').textContent = brushSize;
+});
+
+// Cell selector
+document.getElementById('cell-sel').addEventListener('change', e => {
+    const newCell = parseInt(e.target.value);
+    if (newCell === cellSize) return;
+    buildGrid(newCell, { rows: gridRows, cols: gridCols, data: grid, cell: cellSize });
+    draw();
+});
+
+// Mode
+document.getElementById('btn-solid').addEventListener('click', () => {
+    mode = 'solid';
+    document.getElementById('btn-solid').classList.add('active');
+    document.getElementById('btn-free').classList.remove('active');
+});
+document.getElementById('btn-free').addEventListener('click', () => {
+    mode = 'free';
+    document.getElementById('btn-free').classList.add('active');
+    document.getElementById('btn-solid').classList.remove('active');
+});
+
+// Générer code
+document.getElementById('btn-copy').addEventListener('click', () => {
+    const lines = grid.map(r => '    [' + r.join(',') + ']');
+    const code  =
+        `'use strict';\n\n` +
+        `const COLLISION_CELL = ${cellSize};\n\n` +
+        `const COLLISION_MAP = [\n${lines.join(',\n')}\n];\n`;
+    document.getElementById('code-area').value = code;
+    document.getElementById('modal').classList.add('open');
+});
+
+document.getElementById('btn-clipboard').addEventListener('click', () => {
+    const ta = document.getElementById('code-area');
+    ta.select();
+    try { navigator.clipboard?.writeText(ta.value) ?? document.execCommand('copy'); } catch(_) {}
+    const btn = document.getElementById('btn-clipboard');
+    btn.textContent = '✓ Copié !';
+    setTimeout(() => { btn.textContent = 'Copier dans le presse-papier'; }, 1500);
+});
+document.getElementById('btn-close').addEventListener('click', () => {
+    document.getElementById('modal').classList.remove('open');
+});
+
+// Init
+buildGrid(cellSize);
+applyScale();
+const t = setInterval(draw, 150);
+setTimeout(() => clearInterval(t), 5000);
+</script>
+</body>
+</html>
